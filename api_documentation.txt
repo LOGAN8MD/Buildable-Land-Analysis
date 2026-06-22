@@ -1,0 +1,87 @@
+Buildable Land Analysis API
+Base URL: http://localhost:8000/api/v1
+
+All setback values are feet. GeoJSON coordinates must be EPSG:4326 longitude/latitude.
+
+1. GET /config
+   Returns the default setbacks:
+   {
+     "buffers": {
+       "wetlands": 50.0,
+       "buildings": 20.0,
+       "floodzones": 0.0
+     }
+   }
+
+2. GET /parcels
+   Returns the selectable parcel catalog:
+   [
+     {
+       "parcel_id": "parcel",
+       "property_id": "282818",
+       "address": "NASH HERNANDEZ SR RD 78702",
+       "land_type": "VACANT LOT",
+       "source_acres": 29.29825592,
+       "geometry": "GeoJSON Polygon or MultiPolygon"
+     }
+   ]
+
+3. POST /analysis
+   Runs a new stateless analysis.
+
+   Request:
+   {
+     "parcel_id": "parcel",
+     "constraints": ["wetlands", "floodzones", "buildings"],
+     "buffers": {
+       "wetlands": 50,
+       "buildings": 20,
+       "floodzones": 0
+     }
+   }
+
+   Response:
+   {
+     "parcel_area": float,
+     "excluded_area": float,
+     "buildable_area": float,
+     "breakdown": [
+       {"layer_name": string, "removed_area": float, "reason": string}
+     ],
+     "parcel_geometry": GeoJSON Polygon or MultiPolygon,
+     "constraint_geometries": {
+       "<constraint name>": GeoJSON Polygon or MultiPolygon
+     },
+     "buildable_geometry": GeoJSON Polygon or MultiPolygon,
+     "excluded_geometry": GeoJSON Polygon or MultiPolygon
+   }
+
+4. POST /exclude
+   Subtracts the part of a drawn geometry that overlaps currently buildable land.
+   The endpoint is stateless, so the current analysis geometries and breakdown are required.
+
+   Request:
+   {
+     "edit_type": "exclude",
+     "geometry": GeoJSON Polygon, MultiPolygon, or FeatureCollection,
+     "current_buildable": GeoJSON geometry,
+     "current_excluded": GeoJSON geometry or {},
+     "parcel_geometry": GeoJSON geometry,
+     "constraint_geometries": object,
+     "breakdown": array
+   }
+
+   Response: updated analysis response.
+
+5. POST /restore
+   Restores the part of a drawn geometry that overlaps currently excluded land.
+   Its request and response structures match /exclude, with "edit_type": "restore".
+
+6. GET /health
+   Returns {"status": "ok", "message": "API is healthy"}.
+
+Validation behavior:
+- Unsafe parcel IDs, unknown constraints, unknown buffer keys, and negative buffers return HTTP 422.
+- Edits outside the parcel return HTTP 400.
+- Excluding already excluded land or restoring buildable land returns HTTP 400.
+- Missing parcel files return HTTP 400.
